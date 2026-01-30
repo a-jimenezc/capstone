@@ -4,7 +4,7 @@ import sys
 
 eps = sys.float_info.epsilon
 
-class SimulateEuler:
+class Simulate:
     def __init__(self, fixed_parameters, parameters):
         self.CAPACITANCE = fixed_parameters[0]
         self.E_CA = fixed_parameters[1]
@@ -20,7 +20,7 @@ class SimulateEuler:
         self.v_3 = parameters[6]
         self.v_4 = parameters[7]
 
-    def simulate(self, delta_t, no_timesteps, i_app, v0, n0):
+    def simulate_euler(self, delta_t, no_timesteps, i_app, v0, n0): # test
         v, n= v0, n0
         t = 0
         voltages = [v]
@@ -30,13 +30,13 @@ class SimulateEuler:
             # Calculate fv
             i_l = self.g_l * (v - self.E_L)
             i_k = self.g_k * n * (v - self.E_K)
-            m_inf = 0.5 * (1 + math.tanh((v - self.v_1) / (self.v_2 + eps)))
+            m_inf = 0.5 * (1 + math.tanh((v - self.v_1) / (self.v_2)))
             i_ca = self.g_ca * m_inf * (v - self.E_CA)
             fv = i_app - i_l - i_k - i_ca
 
             # Calculate fn
-            n_inf = 0.5 * (1 + math.tanh((v - self.v_3) / (self.v_4 + eps)))
-            tau = 1 / math.cosh((v - self.v_3) / (2 * self.v_4 + eps))
+            n_inf = 0.5 * (1 + math.tanh((v - self.v_3) / (self.v_4)))
+            tau = 1 / math.cosh((v - self.v_3) / (2 * self.v_4))
             fn = self.phi * ((n_inf - n) / (tau + eps))
 
             # Update
@@ -49,3 +49,12 @@ class SimulateEuler:
             ns.append(n)
             times.append(t)
         return np.array(voltages), np.array(ns), np.array(times)
+    
+    def generate_Hopt_biff_data(self, delta_t, no_timesteps, i_app, v0, n0):
+        return None # V, I_app
+    
+    def generate_SNIC_biff_data(self, delta_t, no_timesteps, i_app, v0, n0):
+        return None # V, I_app
+    
+    def generate_Homoclinic_biff_data(self, delta_t, no_timesteps, i_app, v0, n0):
+        return None # V, I_app
