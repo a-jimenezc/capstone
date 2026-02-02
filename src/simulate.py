@@ -1,8 +1,10 @@
+from src.models import Models
 import numpy as np
 import math
 import sys
 
 eps = sys.float_info.epsilon
+models = Models()
 
 class Simulate:
     def __init__(self, fixed_parameters, parameters):
@@ -28,19 +30,19 @@ class Simulate:
         times = [t]
         for i in range(no_timesteps):
             # Calculate fv
-            i_l = self.g_l * (v - self.E_L)
-            i_k = self.g_k * n * (v - self.E_K)
-            m_inf = 0.5 * (1 + math.tanh((v - self.v_1) / (self.v_2)))
-            i_ca = self.g_ca * m_inf * (v - self.E_CA)
-            fv = i_app - i_l - i_k - i_ca
+            fv = models.fv(v, n, i_app, 
+                           self.CAPACITANCE, self.E_CA, self.E_K, self.E_L,
+                           self.g_l, self.g_k, self.g_ca, self.phi, 
+                           self.v_1, self.v_2, self.v_3, self.v_4)
 
             # Calculate fn
-            n_inf = 0.5 * (1 + math.tanh((v - self.v_3) / (self.v_4)))
-            tau = 1 / math.cosh((v - self.v_3) / (2 * self.v_4))
-            fn = self.phi * ((n_inf - n) / (tau + eps))
+            fn = models.fn(v, n, i_app, 
+                           self.CAPACITANCE, self.E_CA, self.E_K, self.E_L,
+                           self.g_l, self.g_k, self.g_ca, self.phi, 
+                           self.v_1, self.v_2, self.v_3, self.v_4)
 
             # Update
-            v = v + (delta_t/self.CAPACITANCE) * fv
+            v = v + delta_t * fv
             n = n + delta_t * fn
             n = max(0.0, min(1.0, n)) # n should be within [0 1] range
             t = t + delta_t
