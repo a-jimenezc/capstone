@@ -1,6 +1,7 @@
 # %%
 from src.plotter import Plotter
 from src.simulate import Simulate
+from src.parameters import Parameters
 from src.utils import add_noise_to_signal
 import numpy as np
 
@@ -14,9 +15,10 @@ i_app = 100
 v0, n0 = -40, 0.25
 
 fixed_parameters = np.array([20, 120, -84, -60])
-parameters_hopf = np.array([2, 8, 4, 0.04, -1.2, 18, 2, 30])
+var_parameters_hopf = np.array([2, 8, 4, 0.04, -1.2, 18, 2, 30])
+parameters_hopf = Parameters(fixed_parameters, var_parameters_hopf)
 
-sim_hopf = Simulate(fixed_parameters, parameters_hopf)
+sim_hopf = Simulate(parameters_hopf)
 voltages_hopf, ns_hopf, times_hopf = sim_hopf.simulate_euler(
     delta_t, no_timesteps, i_app, v0, n0)
 
