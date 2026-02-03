@@ -19,7 +19,7 @@ class Simulate:
         for i in range(no_timesteps):
             # Calculate fv and fn
             fv = models.fv(v, n, i_app, parameters)
-            fn = models.fn(v, n, i_app, parameters)
+            fn = models.fn(v, n, parameters)
 
             # Update
             v = v + delta_t * fv

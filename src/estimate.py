@@ -1,18 +1,38 @@
+from models import Models
 import numpy as np
 
 class EstimateUKF: # cite paper
-    def __init__(self, alpha, kappa, beta):
+    def __init__(self, alpha, kappa, beta, state_dim):
         '''UKF hyperparameters'''
         self.alpha = alpha # 10e-2 < alpha < 1
         self.kappa = kappa # belongs to {0, 3-L}
         self.beta = beta # = 2 for Gaussian RV
         # self.jitter = 1e-12 ?
 
+        # Weights calculation
+        self.L = state_dim
+        lam = self.alpha**2 * (self.L + self.kappa) - self.L
+
+        alpha_0_m = lam / (self.L + lam)
+        alpha_k_m = 0.5 / (self.L + lam)
+
+        # mean weights
+        self.weights_mean = np.zeros((2*self.L + 1))
+        self.weights_mean[0] = alpha_0_m
+        self.weights_mean[1:] = alpha_k_m
+
+        # covariance weights
+        alpha_0_c = alpha_0_m + (1 - self.alpha**2 + self.beta)
+        alpha_k_c = alpha_k_m
+        self.weights_cov = np.zeros((2*self.L + 1))
+        self.weights_cov[0] = alpha_0_c
+        self.weights_cov[1:] = alpha_k_c
+
     def symmetrize(self, matrix):
         return 0.5 * (matrix + matrix.T)
 
     def sigma_points(self, mean, cov):
-        L = np.size(mean)
+        L = self.L
         lam = self.alpha**2 * (L + self.kappa) - L
         gamma = np.sqrt(L + lam)
         cov = self.symmetrize(cov)
@@ -26,31 +46,41 @@ class EstimateUKF: # cite paper
 
         return sigma_points
     
-    def ukf_mean_cov(self, sigma_points):
-        L = sigma_points.shape[1]
-        lam = self.alpha**2 * (L + self.kappa) - L
-        
-        alpha_0_m = lam / (L + lam)
-        alpha_k_m = 0.5 / (L + lam)
-
+    def mean_cov_from_sigma(self, sigma_points):
         # Calculate mean (rely on numpy broadcasting)
-        weights_mean = np.zeros((2*L + 1))
-        weights_mean[0] = alpha_0_m
-        weights_mean[1:] = alpha_k_m
-        mean = np.sum(weights_mean[:,None] * sigma_points, axis = 0)
+        mean = np.sum(self.weights_mean[:,None] * sigma_points, axis = 0)
 
-        alpha_0_c = alpha_0_m + (1 - self.alpha**2 + self.beta)
-        alpha_k_c = alpha_k_m
-        weights_cov = np.zeros((2*L + 1))
-        weights_cov[0] = alpha_0_c
-        weights_cov[1:] = alpha_k_c
-        sigma_points_centered = sigma_points - mean # mean Numpy broadcasting (L,) -> (2L+1, L), then diff.
-        # Also relying on numpy broadcasting rules to implement weighted sum of outer products
+        # Calculate covariance
+        # (Also relying on numpy broadcasting rules to implement weighted sum of outer products)
+        sigma_points_centered = sigma_points - mean # (L,) -> (2L+1, L), then diff.
         outer_product = sigma_points_centered[:,:,None] * sigma_points_centered[:,None,:]
-        cov = np.sum((weights_cov[:,None,None] * outer_product), axis=0)
+        cov = np.sum((self.weights_cov[:,None,None] * outer_product), axis=0)
         cov = self.symmetrize(cov)
-        
         return mean, cov
+    
+    def Estimate(self, state, state_cov, measur, i_app, parameters, delta_t):
+        '''Do both prediction and update per call'''
+        # Prediction
+        state_sigma_pts = self.sigma_points(state, state_cov)
+        state_sigma_pts_pred = Models.f_morris_euler_ukf(state_sigma_pts, 
+                                            i_app, parameters, delta_t)
+        state_pred, state_cov_pred = self.mean_cov_from_sigma(state_sigma_pts_pred)
+
+        measur_sigma_points_pred = Models.h_morris_ukf(state_sigma_pts_pred)
+        measur_pred, measur_cov = self.mean_cov_from_sigma(measur_sigma_points_pred)
+
+        # Calculate covariance state measurement
+        state_sigma_pts_pred_c = state_sigma_pts_pred - state_pred
+        measur_sigma_points_pred_c =  measur_sigma_points_pred - measur_pred
+        outer_product = state_sigma_pts_pred_c[:, :, None] * measur_sigma_points_pred_c[:, None, :]
+        state_measur_cov = np.sum(self.weights_cov[:, None, None] * outer_product, axis=0) 
+
+        # Correction
+        kalman_gain = state_measur_cov @ np.linalg.inv(measur_cov)
+        state_corrected = state_pred + kalman_gain * (measur - measur_pred)
+        state_cov_corrected = state_cov_pred - kalman_gain @ measur_cov @ kalman_gain.T
+
+        return state_corrected, state_cov_corrected
     
 
 
